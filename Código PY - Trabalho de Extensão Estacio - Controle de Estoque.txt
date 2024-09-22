@@ -1,0 +1,157 @@
+iamport tkinter as tk  
+from tkinter import ttk  
+import pandas as pd  
+import os  
+from datetime import datetime  
+
+class EstoqueApp:  
+    def __init__(self, root):  
+        self.root = root  
+        self.root.title("Controle de Estoque - Mercadinho Veja o Preço")
+        self.root.geometry("800x400")
+
+        # Criar e posicionar os widgets  
+        self.lblNome = tk.Label(root, text='Produto:')
+        self.lblQuantidade = tk.Label(root, text='Quantidade:')  
+        self.lblPreco = tk.Label(root, text='Preço:')
+        
+        self.txtNome = tk.Entry(root)  
+        self.txtQuantidade = tk.Entry(root)  
+        self.txtPreco = tk.Entry(root)  
+        
+        self.btnAdicionar = tk.Button(root, text='Adicionar', command=self.adicionar_item)
+        self.btnRemover = tk.Button(root, text='Remover', command=self.remover_item)
+        self.btnAtualizar = tk.Button(root, text='Atualizar', command=self.atualizar_item)
+        self.btnBuscar = tk.Button(root, text='Buscar', command=self.buscar_item)
+        self.btnLimpar = tk.Button(root, text='Limpar', command=self.limpar_campos)
+        self.btnSalvar = tk.Button(root, text='Salvar', command=self.salvar_em_excel)
+
+        self.tree = ttk.Treeview(root, columns=('Nome', 'Quantidade', 'Preço', 'Data'), show='headings', selectmode='browse')
+        self.tree.heading('Nome', text='Nome')  
+        self.tree.heading('Quantidade', text='Quantidade')  
+        self.tree.heading('Preço', text='Preço')  
+        self.tree.heading('Data', text='Data')  
+        
+        self.lblNome.grid(row=0, column=0, padx=10, pady=5)  
+        self.txtNome.grid(row=0, column=1, padx=10, pady=5)  
+        
+        self.lblQuantidade.grid(row=1, column=0, padx=10, pady=5)  
+        self.txtQuantidade.grid(row=1, column=1, padx=10, pady=5)  
+        
+        self.lblPreco.grid(row=2, column=0, padx=10, pady=5)  
+        self.txtPreco.grid(row=2, column=1, padx=10, pady=5)  
+        
+        self.btnAdicionar.grid(row=3, column=0, padx=10, pady=5)  
+        self.btnRemover.grid(row=4, column=0, padx=10, pady=5)  
+        self.btnAtualizar.grid(row=5, column=0, padx=10, pady=5)  
+        self.btnBuscar.grid(row=6, column=0, padx=10, pady=5)  
+        self.btnLimpar.grid(row=7, column=0, padx=10, pady=5)  
+        self.btnSalvar.grid(row=8, column=0, padx=10, pady=5)  
+        
+        self.tree.grid(row=0, column=2, rowspan=8, padx=10, pady=5, sticky='nsew')  
+        
+        # Configuração da coluna da Treeview  
+        self.tree.column('Nome', width=200)
+        self.tree.column('Quantidade', width=100)  
+        self.tree.column('Preço', width=100)  
+        self.tree.column('Data', width=150)  
+        
+        # Configurações de redimensionamento da Treeview  
+        root.grid_rowconfigure(0, weight=1)  
+        root.grid_columnconfigure(2, weight=1)  
+
+        # Carregar dados existentes  
+        self.carregar_dados()  
+
+    def adicionar_item(self):  
+        nome = self.txtNome.get()  
+        quantidade = self.txtQuantidade.get()  
+        preco = self.txtPreco.get()  
+        
+        if nome and quantidade.isdigit() and self.validar_preco(preco):  
+            data = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  
+            self.tree.insert('', 'end', values=(nome, quantidade, preco, data))  
+            self.limpar_campos()  
+        else:  
+            self.mostrar_erro("Por favor, preencha todos os campos corretamente.")  
+
+    def remover_item(self):  
+        selecionado = self.tree.selection()  
+        if selecionado:  
+            for item in selecionado:  
+                self.tree.delete(item)  
+            self.salvar_em_excel()  # Salva a lista atualizada após a remoção  
+        else:  
+            self.mostrar_erro("Selecione um item para remover.")  
+
+    def atualizar_item(self):  
+        selecionado = self.tree.selection()  
+        if selecionado:  
+            item = selecionado[0]  
+            nome = self.txtNome.get()  
+            quantidade = self.txtQuantidade.get()  
+            preco = self.txtPreco.get()  
+            
+            if nome and quantidade.isdigit() and self.validar_preco(preco):  
+                data = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  
+                self.tree.item(item, values=(nome, quantidade, preco, data))  
+                self.limpar_campos()  
+                self.salvar_em_excel()  # Salva a lista atualizada após a atualização  
+            else:  
+                self.mostrar_erro("Por favor, preencha todos os campos corretamente.")  
+        else:  
+            self.mostrar_erro("Selecione um item para atualizar.")  
+
+    def buscar_item(self):  
+        nome_busca = self.txtNome.get()  
+        for item in self.tree.get_children():  
+            if nome_busca.lower() in self.tree.item(item)['values'][0].lower():  
+                self.tree.selection_set(item)  
+                self.tree.see(item)  
+                return  
+        self.mostrar_erro("Item não encontrado.")  
+
+    def limpar_campos(self):  
+        self.txtNome.delete(0, 'end')  
+        self.txtQuantidade.delete(0, 'end')  
+        self.txtPreco.delete(0, 'end')  
+
+    def salvar_em_excel(self):  
+        itens = []  
+        for linha in self.tree.get_children():  
+            item = self.tree.item(linha)['values']  
+            itens.append(item)  
+        
+        df = pd.DataFrame(itens, columns=['Nome', 'Quantidade', 'Preço', 'Data'])  
+        df.to_excel('estoque.xlsx', index=False)  
+        print("Dados salvos em 'estoque.xlsx'.")  
+
+    def carregar_dados(self):  
+        if os.path.exists('estoque.xlsx'):  
+            try:  
+                df = pd.read_excel('estoque.xlsx')  
+                if 'Data' in df.columns:  
+                    for _, row in df.iterrows():  
+                        self.tree.insert('', 'end', values=(row['Nome'], row['Quantidade'], row['Preço'], row['Data']))  
+                else:  
+                    print("A coluna 'Data' não foi encontrada no arquivo Excel.")  
+            except Exception as e:  
+                print(f"Erro ao carregar dados: {e}")  
+
+    def mostrar_erro(self, mensagem):  
+        popup = tk.Toplevel(self.root)  
+        popup.title("Erro")  
+        tk.Label(popup, text=mensagem).pack(padx=20, pady=10)  
+        tk.Button(popup, text="OK", command=popup.destroy).pack(pady=5)  
+
+    def validar_preco(self, preco):  
+        try:  
+            float(preco)  
+            return float(preco) >= 0  
+        except ValueError:  
+            return False  
+
+if __name__ == '__main__':  
+    root = tk.Tk()  
+    app = EstoqueApp(root)  
+    root.mainloop()  
